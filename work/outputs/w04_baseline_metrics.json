@@ -1,0 +1,10 @@
+{
+  "dev_month": "2026-03",
+  "n_rows": 176738,
+  "base_rate": 0.2810544421686338,
+  "precision_at_50": 0.14,
+  "rule": "score = (content_age_days>=180) * (impressions_month>=500) * impressions_month",
+  "reason_code": "stale_but_visible",
+  "signal_1_staleness_verdict": "MIXED",
+  "signal_2_ctr_verdict": "FALSE"
+}

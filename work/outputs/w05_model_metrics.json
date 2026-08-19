@@ -1,0 +1,35 @@
+{
+  "dev_month": "2026-03",
+  "split": "GroupShuffleSplit by client_hash_id, test_size=0.30, random_state=42",
+  "n_train": 130904,
+  "n_test": 45834,
+  "base_rate_test": 0.2693197189859057,
+  "comparison": [
+    {
+      "model": "Baseline rule (Week 4)",
+      "precision_at_20": 0.0,
+      "precision_at_50": 0.04
+    },
+    {
+      "model": "Logistic Regression",
+      "precision_at_20": 0.55,
+      "precision_at_50": 0.36
+    },
+    {
+      "model": "Random Forest",
+      "precision_at_20": 0.55,
+      "precision_at_50": 0.56
+    }
+  ],
+  "features": [
+    "content_age_days",
+    "impressions_month",
+    "ctr_month",
+    "avg_position_month",
+    "engagement_rate_month",
+    "has_ga4_month",
+    "word_count",
+    "has_word_count"
+  ],
+  "sklearn_note": "random_state=42 fixed throughout; tree-ensemble numbers can shift a few points across sklearn versions"
+}
