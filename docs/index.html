@@ -208,17 +208,24 @@ section.sec{
 }
 section.sec:last-of-type{ border-bottom:none; }
 
+/* Folio numbers live in a reserved gutter, not in whatever outer margin the
+   browser happens to leave — that margin shrinks at some window widths and
+   let the number drift onto the heading. Reserving space inside `main`
+   fixes it regardless of viewport width. */
 .folio{
+  display:none;
   font-family:var(--display);
   font-size:3.6rem;
   line-height:1;
   color:var(--border);
   position:absolute;
-  left:calc(-1 * (3.6rem));
   top:-0.5rem;
   user-select:none;
 }
-@media (max-width:900px){ .folio{ display:none; } }
+@media (min-width:1180px){
+  main{ padding-left:5.2rem; }
+  .folio{ display:block; left:-4.8rem; }
+}
 
 h2{
   font-family:var(--display);
@@ -487,7 +494,7 @@ footer.colophon a{ color:var(--ink); }
 
   <!-- ============================================================ -->
   <section class="sec" id="framing">
-    <span class="folio">01 </span>
+    <span class="folio">01</span>
     <h2>Problem framing</h2>
     <p><strong>Decision supported:</strong> which pages should a content strategist review for refresh first, given limited editorial time and resources.</p>
     <p><strong>Unit of analysis:</strong> one content item per client, aggregated over a calendar month.</p>
@@ -499,7 +506,7 @@ footer.colophon a{ color:var(--ink); }
 
   <!-- ============================================================ -->
   <section class="sec" id="data">
-    <span class="folio">02 </span>
+    <span class="folio">02</span>
     <h2>Data safety</h2>
 
     <h3>Data used</h3>
@@ -527,7 +534,7 @@ footer.colophon a{ color:var(--ink); }
 
   <!-- ============================================================ -->
   <section class="sec" id="baseline">
-    <span class="folio">03 </span>
+    <span class="folio">03</span>
     <h2>Baseline</h2>
     <p><strong>Transparent rule:</strong></p>
     <pre><code>score = (content_age_days &gt;= 180) &times; (impressions_month &gt;= 500) &times; impressions_month</code></pre>
@@ -553,7 +560,7 @@ footer.colophon a{ color:var(--ink); }
 
   <!-- ============================================================ -->
   <section class="sec" id="model">
-    <span class="folio">04 </span>
+    <span class="folio">04</span>
     <h2>Model / analysis</h2>
 
     <p><strong>Method:</strong> Random Forest classifier — 300 trees, max depth 6, min samples per leaf 20, <code>random_state=42</code>.</p>
@@ -590,7 +597,7 @@ footer.colophon a{ color:var(--ink); }
 
   <!-- ============================================================ -->
   <section class="sec" id="evaluation">
-    <span class="folio">05 </span>
+    <span class="folio">05</span>
     <h2>Evaluation</h2>
 
     <div class="with-note">
@@ -617,7 +624,7 @@ footer.colophon a{ color:var(--ink); }
 
   <!-- ============================================================ -->
   <section class="sec" id="interpretation">
-    <span class="folio">06 </span>
+    <span class="folio">06</span>
     <h2>Interpretation</h2>
 
     <h3>Top features by permutation importance</h3>
@@ -648,7 +655,7 @@ footer.colophon a{ color:var(--ink); }
 
   <!-- ============================================================ -->
   <section class="sec" id="recommendation">
-    <span class="folio">07-</span>
+    <span class="folio">07</span>
     <h2>Recommendation</h2>
 
     <p>The model's score converts into a ranked action queue with three labels:</p>
@@ -664,7 +671,7 @@ footer.colophon a{ color:var(--ink); }
       <figcaption>Figure 2. Action label distribution across the full ranked queue.</figcaption>
     </figure>
 
-    <a class="csv-chip" href="work/outputs/w07_action_queue.csv">&#8595; Download the full ranked queue (CSV)</a>
+    <a class="csv-chip" href="w07_action_queue.csv">&#8595; Download the full ranked queue (CSV)</a>
 
     <p><strong>How a FlyRank editor would use it tomorrow:</strong> start at rank 1, review the page — is it live? is the decline seasonal? is an update already scheduled? — and only then decide whether to refresh content, update metadata, or leave it as is. Every item must pass a human check; the model is decision-support, not an automated system.</p>
 
@@ -676,7 +683,7 @@ footer.colophon a{ color:var(--ink); }
 
   <!-- ============================================================ -->
   <section class="sec" id="repro">
-    <span class="folio">08 </span>
+    <span class="folio">08</span>
     <h2>Reproducibility</h2>
 
     <table class="kv">
@@ -695,7 +702,7 @@ footer.colophon a{ color:var(--ink); }
 
   <!-- ============================================================ -->
   <section class="sec" id="ack" style="border-bottom:none;">
-    <span class="folio">09 </span>
+    <span class="folio">09</span>
     <h2>Acknowledgments</h2>
     <p>Built on the FlyRank ML Internship dataset — <a href="https://flyrank.ai">flyrank.ai</a></p>
   </section>
