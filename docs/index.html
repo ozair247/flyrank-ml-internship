@@ -3,348 +3,727 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Prioritizing Content Refreshes with Search Data — a decision-support model for SEO teams.">
-<meta name="author" content="Ozair Malik">
-<meta name="theme-color" content="#1d2940">
-<title>Prioritizing Content Refreshes with Search Data | Capstone Paper</title>
+<title>Refresh / Content Opportunity Scoring — Capstone Report</title>
+<meta name="description" content="Capstone report, Lane 2 — Refresh / Content Opportunity Scoring. FlyRank ML Internship.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%238C2F2B' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%238C2F2B' stroke-width='1'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Display&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
+
+/* =====================================================================
+   TOKENS — "audit ledger" identity: graphite ink, oxblood stamp, paper.
+   Deliberately not navy/gold, not cream+terracotta, not broadsheet.
+===================================================================== */
 :root{
-  --ink:#1b1d21;
-  --ink-soft:#363b43;
-  --muted:#707781;
-  --paper:#ffffff;
-  --canvas:#f3f2ef;
-  --line:#deddd9;
-  --line-dark:#1a1a1a;
-  --accent:#8e1b1b;
-  --accent-soft:#f7eeee;
-  --navy:#1d2940;
-  --max:1160px;
-  --reading:820px;
-  --serif:"Lora", Georgia, "Times New Roman", serif;
-  --sans:"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ink:        #14171A;
+  --ink-soft:   #4A4F58;
+  --accent:     #8C2F2B;   /* oxblood — the one bold color, spent on stamps + rules */
+  --accent-soft:#F3E3DF;
+  --good:       #3E6B4F;
+  --paper:      #F1EFE7;
+  --surface:    #FFFFFF;
+  --border:     #DDD8CB;
+  --display:    'Libre Caslon Display', Georgia, serif;
+  --text-serif: 'Libre Caslon Text', Georgia, serif;
+  --body:       'Source Serif 4', Georgia, serif;
+  --mono:       'Space Mono', ui-monospace, monospace;
+  --measure:    680px;
+  --note-w:     220px;
 }
-*{box-sizing:border-box}
-html{scroll-behavior:smooth}
+
+*{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+@media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } }
+
 body{
-  margin:0;background:var(--canvas);color:var(--ink);
-  font-family:var(--serif);font-size:18px;line-height:1.82;
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:17px;
+  line-height:1.7;
   -webkit-font-smoothing:antialiased;
 }
-::selection{background:#ead3d3;color:#111}
-a{color:var(--accent)}
-.site-top{
-  position:sticky;top:0;z-index:50;background:rgba(250,250,249,.92);
-  backdrop-filter:blur(12px);border-bottom:1px solid rgba(30,30,30,.10)
+::selection{ background:var(--accent-soft); color:var(--accent); }
+a{ color:var(--accent); text-decoration-thickness:1px; }
+a:focus-visible, [tabindex]:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+
+/* ---------------------------------------------------------------
+   TITLE PAGE
+--------------------------------------------------------------- */
+.titlepage{
+  max-width:900px;
+  margin:0 auto;
+  padding:4.5rem 1.5rem 3rem;
+  text-align:center;
 }
-.site-top-inner{max-width:var(--max);margin:0 auto;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;gap:24px}
-.wordmark{font:800 11px var(--sans);letter-spacing:.15em;text-transform:uppercase;color:var(--navy);white-space:nowrap}
-.top-nav{display:flex;gap:18px;overflow:auto;white-space:nowrap}
-.top-nav a{font:600 11px var(--sans);text-transform:uppercase;letter-spacing:.08em;color:#6b7077;text-decoration:none}
-.top-nav a:hover{color:var(--accent)}
-.hero{
-  background:var(--paper);border-bottom:1px solid var(--line);
-  padding:88px 28px 60px;
+.report-tag{
+  font-family:var(--mono);
+  font-size:0.72rem;
+  letter-spacing:0.18em;
+  text-transform:uppercase;
+  color:var(--accent);
+  border:1px solid var(--accent);
+  display:inline-block;
+  padding:0.3rem 0.9rem;
+  border-radius:2px;
+  margin-bottom:2rem;
 }
-.hero-inner{max-width:920px;margin:0 auto;text-align:center}
-.eyebrow{font:800 11px var(--sans);text-transform:uppercase;letter-spacing:.18em;color:var(--accent);margin-bottom:22px}
-.hero h1{
-  font:800 clamp(2.65rem,6vw,4.8rem)/1.05 var(--sans);letter-spacing:-.045em;
-  color:#111;margin:0 auto 22px;max-width:900px
+.titlepage .rule{ width:64px; height:2px; background:var(--ink); margin:0 auto; }
+.titlepage h1{
+  font-family:var(--display);
+  font-weight:400;
+  font-size:clamp(2.2rem, 5vw, 3.4rem);
+  line-height:1.12;
+  letter-spacing:-0.005em;
+  margin:1.6rem auto 1.1rem;
+  max-width:760px;
 }
-.hero-subtitle{
-  font:400 1.14rem/1.6 var(--sans);color:#626873;max-width:760px;margin:0 auto 28px
+.titlepage .subtitle{
+  font-family:var(--text-serif);
+  font-style:italic;
+  font-size:1.2rem;
+  color:var(--ink-soft);
+  max-width:520px;
+  margin:0 auto 2.2rem;
 }
-.author-strip{
-  display:flex;justify-content:center;align-items:center;gap:0;flex-wrap:wrap;
-  max-width:760px;margin:0 auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line)
+.byline{
+  font-family:var(--mono);
+  font-size:0.82rem;
+  color:var(--ink-soft);
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:0 1.8rem;
+  border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  padding:1rem 0;
 }
-.author-strip span{
-  padding:13px 18px;font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:#6c7179
+.byline strong{ color:var(--ink); }
+
+/* ---------------------------------------------------------------
+   ABSTRACT — with the first verdict stamp
+--------------------------------------------------------------- */
+.abstract-block{
+  max-width:900px;
+  margin:0 auto 3.5rem;
+  padding:0 1.5rem;
+  display:grid;
+  grid-template-columns:1fr 150px;
+  gap:2rem;
+  align-items:center;
 }
-.author-strip span+span{border-left:1px solid var(--line)}
-.author-strip strong{color:#222}
-.page-shell{max-width:var(--max);margin:0 auto;display:grid;grid-template-columns:220px minmax(0,820px);gap:44px;align-items:start;padding:44px 28px 80px}
-.toc{
-  position:sticky;top:67px;align-self:start;background:rgba(255,255,255,.72);
-  border:1px solid var(--line);padding:20px 18px
+@media (max-width:640px){ .abstract-block{ grid-template-columns:1fr; justify-items:center; text-align:center; } }
+.abstract-block .label{
+  font-family:var(--mono);
+  font-size:0.72rem;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:var(--ink-soft);
+  margin-bottom:0.8rem;
 }
-.toc-title{font:800 10px var(--sans);letter-spacing:.15em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
-.toc a{display:block;text-decoration:none;color:#626872;font:600 11px/1.45 var(--sans);padding:7px 0}
-.toc a:hover{color:var(--accent)}
-.paper{background:var(--paper);border:1px solid var(--line);box-shadow:0 20px 55px rgba(20,20,20,.05)}
-.abstract{
-  padding:38px 56px 42px;border-bottom:1px solid var(--line);
-  background:linear-gradient(180deg,#fff 0%,#fcfbfa 100%);
+.abstract-block p{
+  font-family:var(--text-serif);
+  font-size:1.12rem;
+  line-height:1.65;
+  color:#22262C;
 }
-.abstract-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-.abstract-rule{height:1px;background:var(--line);flex:1}
-.abstract-label{font:800 11px var(--sans);text-transform:uppercase;letter-spacing:.15em;color:var(--accent)}
-.abstract p{margin:0;font-size:1.05rem;line-height:1.8;color:#4f555c;text-align:justify}
-.content{padding:4px 56px 56px}
-section{padding:37px 0 40px;border-bottom:1px solid var(--line);scroll-margin-top:90px}
-section:last-of-type{border-bottom:0}
+
+/* Verdict stamp — the signature element. Mirrors the "Verdict:" callouts
+   used throughout the underlying notebooks; recurs at each major finding
+   and again at the certification block that closes the report. */
+.stamp{
+  width:148px; height:148px;
+  border-radius:50%;
+  border:7px double var(--accent);
+  color:var(--accent);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center;
+  transform:rotate(-6deg);
+  font-family:var(--mono);
+  text-transform:uppercase;
+  flex-shrink:0;
+  padding:0.5rem;
+}
+.stamp .s-label{ font-size:0.58rem; letter-spacing:0.13em; }
+.stamp .s-value{ font-size:1.55rem; font-weight:700; line-height:1.05; margin:0.2rem 0; }
+.stamp .s-sub{ font-size:0.56rem; letter-spacing:0.04em; color:var(--ink-soft); text-transform:none; line-height:1.3; }
+.stamp.small{ width:104px; height:104px; }
+.stamp.small .s-value{ font-size:1.05rem; }
+
+/* ---------------------------------------------------------------
+   PRINTED TABLE OF CONTENTS
+--------------------------------------------------------------- */
+nav.toc{
+  max-width:640px;
+  margin:0 auto 4rem;
+  padding:2rem 1.75rem;
+  background:var(--surface);
+  border:1px solid var(--border);
+}
+nav.toc .toc-heading{
+  font-family:var(--mono);
+  font-size:0.72rem;
+  letter-spacing:0.16em;
+  text-transform:uppercase;
+  color:var(--ink-soft);
+  margin-bottom:1.1rem;
+}
+nav.toc ol{ list-style:none; margin:0; padding:0; }
+nav.toc li{ margin-bottom:0.55rem; }
+.toc-row{
+  display:flex;
+  align-items:baseline;
+  text-decoration:none;
+  color:var(--ink);
+  font-family:var(--text-serif);
+  font-size:1.02rem;
+}
+.toc-row:hover{ color:var(--accent); }
+.toc-row .leader{
+  flex:1;
+  border-bottom:1px dotted var(--border);
+  margin:0 0.5em;
+  transform:translateY(-5px);
+}
+.toc-row .num{ font-family:var(--mono); font-size:0.85rem; color:var(--ink-soft); }
+
+/* ---------------------------------------------------------------
+   MAIN COLUMN + SIDENOTES
+--------------------------------------------------------------- */
+main{
+  max-width:calc(var(--measure) + var(--note-w) + 3rem);
+  margin:0 auto;
+  padding:0 1.5rem 5rem;
+}
+
+section.sec{
+  position:relative;
+  max-width:var(--measure);
+  padding-bottom:3rem;
+  margin-bottom:3rem;
+  border-bottom:1px solid var(--border);
+  scroll-margin-top:2rem;
+}
+section.sec:last-of-type{ border-bottom:none; }
+
+.folio{
+  font-family:var(--display);
+  font-size:3.6rem;
+  line-height:1;
+  color:var(--border);
+  position:absolute;
+  left:calc(-1 * (3.6rem));
+  top:-0.5rem;
+  user-select:none;
+}
+@media (max-width:900px){ .folio{ display:none; } }
+
 h2{
-  font:800 24px/1.25 var(--sans);letter-spacing:-.025em;color:#111;margin:0 0 24px;
-  padding:0;position:relative
+  font-family:var(--display);
+  font-weight:400;
+  font-size:1.85rem;
+  margin:0 0 1.4rem;
+  letter-spacing:-0.005em;
 }
-h2:before{
-  content:"";display:block;width:34px;height:2px;background:var(--accent);margin-bottom:11px
+h3{
+  font-family:var(--mono);
+  font-size:0.86rem;
+  text-transform:uppercase;
+  letter-spacing:0.06em;
+  color:var(--accent);
+  margin:2rem 0 0.9rem;
 }
-h3{font:700 17px/1.35 var(--sans);color:#16191d;margin:30px 0 12px}
-p{margin:0 0 17px}
-p strong{font-family:var(--sans);font-size:.9em;letter-spacing:-.01em}
-ul,ol{margin:0 0 20px;padding-left:25px}
-li{margin:7px 0}
-code{font:500 .82em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#f3f1ef;color:#6d1717;padding:.17em .4em;border-radius:3px}
-table{width:100%;border-collapse:collapse;margin:26px 0 12px;font:14px var(--sans)}
-thead tr{border-top:2px solid var(--line-dark);border-bottom:1px solid var(--line-dark)}
-tbody tr{border-bottom:1px solid var(--line)}
-tbody tr:last-child{border-bottom:2px solid var(--line-dark)}
-th,td{padding:13px 10px;text-align:left}
-th{font-weight:750;color:#15181c}
-caption{caption-side:bottom;text-align:left;font:12px/1.55 var(--sans);color:#6c737b;margin-top:10px}
+p{ margin:0 0 1.15rem; }
+strong{ font-weight:600; }
+ul, ol.plain{ margin:0 0 1.2rem 1.3rem; padding:0; }
+li{ margin-bottom:0.5rem; }
+
+code{
+  font-family:var(--mono);
+  background:#E9E5D8;
+  padding:0.1rem 0.38rem;
+  border-radius:3px;
+  font-size:0.85em;
+}
 pre{
-  background:#faf9f7;border:1px solid var(--line);border-left:3px solid var(--line-dark);
-  padding:18px 20px;overflow:auto;margin:22px 0;font:12.5px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#25282d
+  font-family:var(--mono);
+  font-size:0.85rem;
+  background:var(--ink);
+  color:#EDE9DD;
+  padding:1.1rem 1.3rem;
+  overflow-x:auto;
+  margin:1.2rem 0;
+  border-radius:2px;
 }
-pre code{padding:0;background:none;color:inherit}
-.result-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:28px 0 20px}
-.result-card{padding:18px 18px 16px;border:1px solid var(--line);background:#fff}
-.result-value{display:block;font:800 28px/1 var(--sans);letter-spacing:-.03em;color:var(--navy)}
-.result-label{display:block;margin-top:8px;font:800 10px var(--sans);letter-spacing:.11em;text-transform:uppercase;color:#4d535b}
-.result-note{display:block;margin-top:4px;font:12px var(--sans);color:#848a92}
-.finding{
-  border-left:4px solid var(--accent);background:var(--accent-soft);padding:17px 19px;margin:20px 0 28px
+pre code{ background:none; padding:0; color:inherit; }
+
+/* with-note wrapper needed so an absolutely-positioned sidenote has
+   something to anchor to; collapses to a normal block on narrow screens */
+.with-note{ position:relative; }
+aside.sidenote{
+  font-family:var(--mono);
+  font-size:0.78rem;
+  line-height:1.5;
+  color:var(--ink-soft);
+  background:var(--surface);
+  border-left:2px solid var(--accent);
+  padding:0.7rem 0.9rem;
+  margin:1rem 0;
 }
-.finding-tag{font:800 10px var(--sans);text-transform:uppercase;letter-spacing:.13em;color:var(--accent);margin-bottom:6px}
-.finding p{font:14px/1.65 var(--sans);color:#4d3131;margin:0}
-.figure{margin:30px 0 8px;text-align:center}
-.figure img{display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid var(--line);background:#fff}
-.figure figcaption{font:12px/1.6 var(--sans);color:#747a82;text-align:left;margin-top:10px}
-.site-footer{max-width:820px;margin:0 auto;padding:0 28px 60px;text-align:center;color:#747a82;font:12px/1.7 var(--sans)}
-.site-footer a{text-decoration:none;color:var(--accent);font-weight:650}
-.print-note{display:none}
-@media(max-width:980px){
-  .page-shell{grid-template-columns:1fr;gap:18px}
-  .toc{position:static;display:flex;gap:14px;align-items:center;overflow:auto;padding:12px 15px}
-  .toc-title{margin:0;white-space:nowrap}
-  .toc a{padding:0;white-space:nowrap}
+aside.sidenote strong{ color:var(--ink); }
+@media (min-width:901px){
+  aside.sidenote{
+    position:absolute;
+    top:0;
+    right:calc(-1 * var(--note-w) - 40px);
+    width:var(--note-w);
+    margin:0;
+    border-left:none;
+    border-top:2px solid var(--accent);
+    padding:0.6rem 0 0;
+    background:none;
+  }
 }
-@media(max-width:720px){
-  body{font-size:16.5px}
-  .site-top-inner{padding:10px 15px}.wordmark{display:none}
-  .top-nav{width:100%;justify-content:flex-start}
-  .hero{padding:58px 18px 38px}.hero h1{font-size:2.45rem}
-  .hero-subtitle{font-size:1rem}
-  .author-strip{display:grid;grid-template-columns:1fr}
-  .author-strip span+span{border-left:0;border-top:1px solid var(--line)}
-  .page-shell{padding:18px 12px 50px}
-  .abstract,.content{padding-left:22px;padding-right:22px}
-  .result-summary{grid-template-columns:1fr}
-  table{font-size:12px}
-  th,td{padding:9px 7px}
+
+/* ---------------------------------------------------------------
+   TABLES
+--------------------------------------------------------------- */
+table.ledger{
+  width:100%;
+  border-collapse:collapse;
+  margin:1.4rem 0;
+  font-size:0.93rem;
+  background:var(--surface);
+  border:1px solid var(--border);
 }
-@media print{
-  body{background:#fff}.site-top,.toc{display:none}.hero{padding:30px 0 20px}
-  .hero h1{font-size:34px}.page-shell{display:block;padding:0}.paper{border:0;box-shadow:none}
-  .abstract,.content{padding-left:0;padding-right:0}
-  section{break-inside:avoid}.site-footer{padding-bottom:20px}
-  .print-note{display:block;font:11px var(--sans);color:#666;text-align:center;margin-top:10px}
+table.ledger th, table.ledger td{
+  padding:0.7rem 1rem;
+  text-align:left;
+  border-bottom:1px solid var(--border);
 }
+table.ledger thead th{
+  font-family:var(--mono);
+  font-size:0.72rem;
+  text-transform:uppercase;
+  letter-spacing:0.05em;
+  color:var(--ink-soft);
+  background:#EAE7DC;
+}
+table.ledger td.num, table.ledger th.num{ font-family:var(--mono); text-align:right; }
+table.ledger tbody tr:last-child td{ border-bottom:none; }
+table.ledger tr.win td{ background:var(--accent-soft); }
+
+table.kv{ width:100%; border-collapse:collapse; margin:1.2rem 0; font-size:0.92rem; }
+table.kv th{
+  width:180px; text-align:left; vertical-align:top;
+  font-family:var(--mono); font-size:0.78rem; color:var(--ink-soft); font-weight:400;
+  padding:0.55rem 0.9rem 0.55rem 0; border-bottom:1px solid var(--border);
+}
+table.kv td{ padding:0.55rem 0; border-bottom:1px solid var(--border); vertical-align:top; }
+table.kv tr:last-child th, table.kv tr:last-child td{ border-bottom:none; }
+
+/* ---------------------------------------------------------------
+   CALLOUTS
+--------------------------------------------------------------- */
+.callout{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-left:4px solid var(--accent);
+  padding:1.1rem 1.35rem;
+  margin:1.5rem 0;
+  font-size:0.95rem;
+}
+.callout .callout-label{
+  font-family:var(--mono);
+  font-size:0.7rem;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  color:var(--accent);
+  display:block;
+  margin-bottom:0.4rem;
+}
+.callout.negative{ border-left-color:var(--ink-soft); }
+.callout.negative .callout-label{ color:var(--ink-soft); }
+
+.stat-strip{
+  display:flex; gap:0.9rem; flex-wrap:wrap; margin:1.6rem 0 2rem;
+}
+.stat-chip{
+  flex:1 1 160px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  padding:0.9rem 1.1rem;
+}
+.stat-chip .v{ font-family:var(--mono); font-weight:700; font-size:1.3rem; color:var(--ink); display:block; }
+.stat-chip .l{ font-size:0.8rem; color:var(--ink-soft); margin-top:0.2rem; }
+
+/* ---------------------------------------------------------------
+   FIGURES
+--------------------------------------------------------------- */
+figure.fig{ margin:1.6rem 0; }
+figure.fig img{
+  width:100%;
+  display:block;
+  border:1px solid var(--border);
+  background:var(--surface);
+}
+figure.fig figcaption{
+  font-family:var(--mono);
+  font-size:0.8rem;
+  color:var(--ink-soft);
+  margin-top:0.6rem;
+}
+.fig-missing{
+  border:1.5px dashed var(--border);
+  padding:2.2rem 1.4rem;
+  text-align:center;
+  color:var(--ink-soft);
+  font-family:var(--mono);
+  font-size:0.82rem;
+  background:#EDEAE0;
+}
+
+.csv-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:0.5rem;
+  font-family:var(--mono);
+  font-size:0.82rem;
+  border:1px solid var(--ink);
+  color:var(--ink);
+  padding:0.5rem 1rem;
+  text-decoration:none;
+  margin:0.4rem 0 1.4rem;
+}
+.csv-chip:hover{ background:var(--ink); color:var(--paper); }
+
+/* ---------------------------------------------------------------
+   DEFINITION LIST — action labels
+--------------------------------------------------------------- */
+dl.actions{ margin:1.4rem 0; }
+dl.actions > div{ display:flex; gap:1rem; padding:0.7rem 0; border-bottom:1px solid var(--border); }
+dl.actions dt{
+  font-family:var(--mono); font-size:0.82rem; color:var(--accent);
+  width:180px; flex-shrink:0;
+}
+dl.actions dd{ margin:0; font-size:0.95rem; }
+
+/* ---------------------------------------------------------------
+   CERTIFICATION / CLOSING STAMP
+--------------------------------------------------------------- */
+.certification{
+  max-width:var(--measure);
+  border:1px solid var(--ink);
+  padding:2.2rem 2rem;
+  margin:0 auto 4rem;
+  display:grid;
+  grid-template-columns:1fr 148px;
+  gap:2rem;
+  align-items:center;
+}
+@media (max-width:640px){ .certification{ grid-template-columns:1fr; text-align:center; justify-items:center; } }
+.certification h3{ margin-top:0; }
+.certification ul{ font-size:0.92rem; margin-bottom:0; }
+.certification li{ margin-bottom:0.35rem; }
+
+/* ---------------------------------------------------------------
+   FOOTER
+--------------------------------------------------------------- */
+footer.colophon{
+  text-align:center;
+  padding:0 1.5rem 3.5rem;
+  color:var(--ink-soft);
+  font-family:var(--mono);
+  font-size:0.82rem;
+}
+footer.colophon a{ color:var(--ink); }
+
 </style>
 </head>
 <body>
 
-<header class="site-top">
-  <div class="site-top-inner">
-    <div class="wordmark">Capstone Research</div>
-    <nav class="top-nav" aria-label="Paper navigation">
-      <a href="#introduction">Introduction</a>
-      <a href="#data">Data</a>
-      <a href="#methodology">Method</a>
-      <a href="#results">Results</a>
-      <a href="#limitations">Limits</a>
-      <a href="#recommendations">Actions</a>
-      <a href="#reproducibility">Reproducibility</a>
-    </nav>
-  </div>
-</header>
-
-<header class="hero">
-  <div class="hero-inner">
-    <div class="eyebrow">FlyRank ML Internship · Capstone Research Paper</div>
-    <h1>Prioritizing Content Refreshes with Search Data</h1>
-    <p class="hero-subtitle">A decision-support model for SEO teams, built on the FlyRank ML Internship dataset</p>
-    <div class="author-strip">
-      <span><strong>Author</strong> · Ozair Malik</span>
-      <span><strong>Lane</strong> · Refresh / Content Scoring</span>
-      <span><strong>Date</strong> · 27 August 2026</span>
-    </div>
-  </div>
-</header>
-
-<main class="page-shell">
-  <aside class="toc" aria-label="Contents">
-    <div class="toc-title">Contents</div>
-    <a href="#introduction">01 · Introduction</a>
-    <a href="#data">02 · Data</a>
-    <a href="#methodology">03 · Methodology</a>
-    <a href="#results">04 · Results</a>
-    <a href="#limitations">05 · Limitations</a>
-    <a href="#recommendations">06 · Recommendations</a>
-    <a href="#reproducibility">07 · Reproducibility</a>
-  </aside>
-
-  <article class="paper">
-    <section class="abstract">
-      <div class="abstract-head">
-        <span class="abstract-label">Abstract</span>
-        <span class="abstract-rule"></span>
-      </div>
-      <p>We ask whether a learned model can prioritize content refresh candidates better than a hand‑written rule using only search performance and content metadata from a single month. The analysis uses 9.8 million daily search rows from March 2026, aggregated to 176,000 content‑item records with features such as age, impressions, CTR, average position, and engagement signals. A Random Forest model trained on these features and evaluated on a client‑grouped held‑out split achieves Precision@50 of 0.56, compared with 0.04 for the Week‑4 baseline rule — a 52‑percentage‑point improvement. The model output is converted into a ranked action queue with reason codes, intended to help a content strategist decide which pages to review first. All findings are directional and decision‑support only; no production claims are made.</p>
-    </section>
-
-    <div class="content">
-      
-    
-
-    <section>
-      <h2 id="introduction">1. Introduction / Problem statement</h2>
-      <p><strong>Decision supported:</strong> Which pages should a content strategist review for refresh first, given limited editorial time and resources.</p>
-      <p><strong>Unit of analysis:</strong> One content item per client, aggregated over a calendar month.</p>
-      <p><strong>Output:</strong> A ranked list (score) with action labels and reason codes.</p>
-      <p><strong>Human action:</strong> Start at rank 1 and review the page for possible content refresh, metadata updates, or consolidation. Do not automate actions; every recommendation requires human judgment.</p>
-      <p><strong>Cost of a wrong call:</strong> A false positive wastes editorial time on a page that does not need a refresh; a false negative lets a declining page go unnoticed, risking further traffic loss.</p>
-      <p><strong>Why data/ML helps:</strong> The signal space (age, impressions, position, CTR, engagement) is small and interpretable, but a simple rule cannot capture non‑linear interactions. A learned model can combine these signals more flexibly and produce a calibrated risk score.</p>
-    </section>
-
-    <section>
-      <h2 id="data">2. Data</h2>
-      <p><strong>Release:</strong> FlyRank internship warehouse (Hugging Face <code>FlyRank/internship-warehouse</code>).</p>
-      <p><strong>Tables used:</strong> <code>fact_content_daily_performance</code> (partitioned, month=2026-03), <code>dim_content</code>.</p>
-      <p><strong>Date window:</strong> March 1–31, 2026 (mid‑panel). The sealed <code>month=2026-06</code> and <code>_sample</code> were never used.</p>
-      <p><strong>Excluded:</strong></p>
-      <ul>
-        <li>Rows with missing <code>content_created_date</code> (age cannot be computed).</li>
-        <li>Rows with zero impressions (no signal).</li>
-        <li>GA4 metrics where <code>ga4_data_available</code> is false.</li>
-        <li>Any client or URL identifiers – kept hashed; no raw names or URLs appear.</li>
-      </ul>
-      <p><strong>Public safety:</strong> All content is pseudonymized; only aggregate statistics are reported.</p>
-    </section>
-
-    <section>
-      <h2 id="methodology">3. Methodology</h2>
-      <p><strong>Assumptions:</strong> The proxy label (<code>is_declining_proxy</code>) — a ≥20% drop in impressions in the last 15 days vs. the prior 15 days — is a reasonable signal of content decay. March 2026 is representative.</p>
-      <p><strong>Features:</strong> <code>content_age_days</code>, <code>impressions_month</code>, <code>ctr_month</code>, <code>avg_position_month</code>, <code>engagement_rate_month</code>, <code>has_ga4_month</code>, <code>word_count</code>, <code>has_word_count</code>.</p>
-      <p><strong>Label definition:</strong> <code>is_declining_proxy</code> = 1 if <code>impr_prev15 &gt; 0</code> and <code>impr_last15 &lt; 0.8 * impr_prev15</code>, else 0. Label ingredients are never used as features.</p>
-      <p><strong>Baseline:</strong> Week‑4 rule: <code>score = (content_age_days ≥ 180) * (impressions_month ≥ 500) * impressions_month</code>.</p>
-      <p><strong>Validation design:</strong> Grouped split by <code>client_hash_id</code> (70% train, 30% test) to prevent leakage. Same split for baseline and model.</p>
-      <p><strong>Leakage checks:</strong> No overlap between features and label ingredients or product flags.</p>
-    </section>
-
-    <section>
-      <h2 id="results">4. Results (vs baseline)</h2>
-      <p>Performance on a held‑out set of 15 clients:</p>
-<div class="result-summary" aria-label="Key results">
-  <div class="result-card">
-    <span class="result-value">0.56</span>
-    <span class="result-label">Precision@50</span>
-    <span class="result-note">Random Forest</span>
-  </div>
-  <div class="result-card">
-    <span class="result-value">+52 pp</span>
-    <span class="result-label">vs. baseline</span>
-    <span class="result-note">Precision@50</span>
-  </div>
-  <div class="result-card">
-    <span class="result-value">0.649</span>
-    <span class="result-label">AUROC</span>
-    <span class="result-note">Held-out clients</span>
+<div class="titlepage">
+  <span class="report-tag">FlyRank ML Internship · Capstone Report</span>
+  <div class="rule"></div>
+  <h1>Refresh &amp; Content<br>Opportunity Scoring</h1>
+  <p class="subtitle">Can a learned model prioritize which pages to review before a hand-written rule can?</p>
+  <div class="byline">
+    <span><strong>Author</strong> — Ozair Malik</span>
+    <span><strong>Lane</strong> — 2, Refresh / Content Opportunity Scoring</span>
+    <span><strong>Date</strong> — 28 Aug 2026</span>
   </div>
 </div>
-<div class="finding">
-  <div class="finding-tag">Key finding</div>
-  <p>The learned model substantially outperforms the hand-written baseline at the top of the ranking, while the paper explicitly treats the evidence as directional and decision-support only.</p>
+
+<div class="abstract-block">
+  <div>
+    <span class="label">Abstract</span>
+    <p>We ask whether a learned model can prioritize content refresh candidates better than a hand-written rule, using only search performance and content metadata from a single month. The analysis uses 9.8 million daily search rows from March 2026, aggregated to 176,000 content-item records, with features spanning age, impressions, CTR, average position, and engagement. A Random Forest trained on these features and evaluated on a client-grouped, held-out split achieves Precision@50 of 0.56, against 0.04 for the Week-4 baseline rule — a 52-percentage-point improvement. The model's output is converted into a ranked action queue with reason codes, intended to help a content strategist decide which pages to review first. All findings are directional and decision-support only; no production claims are made.</p>
+  </div>
+  <div class="stamp">
+    <span class="s-label">Verdict</span>
+    <span class="s-value">0.56</span>
+    <span class="s-sub">Precision@50, RF<br>vs. 0.04 baseline</span>
+  </div>
 </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Model</th>
-            <th>Precision@20</th>
-            <th>Precision@50</th>
-            <th>AUROC</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Baseline rule</td>
-            <td>0.00</td>
-            <td>0.04</td>
-            <td>0.500</td>
-          </tr>
-          <tr>
-            <td>Random Forest</td>
-            <td>0.55</td>
-            <td>0.56</td>
-            <td>0.649</td>
-          </tr>
-        </tbody>
-        <caption>Table 1: Test base rate = 0.269. The Random Forest beats the baseline by 52 percentage points at Precision@50. This is directional evidence, not production proof.</caption>
-      </table>
+<nav class="toc" aria-label="Table of contents">
+  <p class="toc-heading">Contents</p>
+  <ol>
+    <li><a class="toc-row" href="#framing"><span>Problem framing</span><span class="leader"></span><span class="num">§1</span></a></li>
+    <li><a class="toc-row" href="#data"><span>Data safety</span><span class="leader"></span><span class="num">§2</span></a></li>
+    <li><a class="toc-row" href="#baseline"><span>Baseline</span><span class="leader"></span><span class="num">§3</span></a></li>
+    <li><a class="toc-row" href="#model"><span>Model / analysis</span><span class="leader"></span><span class="num">§4</span></a></li>
+    <li><a class="toc-row" href="#evaluation"><span>Evaluation</span><span class="leader"></span><span class="num">§5</span></a></li>
+    <li><a class="toc-row" href="#interpretation"><span>Interpretation</span><span class="leader"></span><span class="num">§6</span></a></li>
+    <li><a class="toc-row" href="#recommendation"><span>Recommendation</span><span class="leader"></span><span class="num">§7</span></a></li>
+    <li><a class="toc-row" href="#repro"><span>Reproducibility</span><span class="leader"></span><span class="num">§8</span></a></li>
+    <li><a class="toc-row" href="#ack"><span>Acknowledgments</span><span class="leader"></span><span class="num">§9</span></a></li>
+  </ol>
+</nav>
 
-      <h3>Feature importance</h3>
-      <figure class="figure"><img src="figures/importance.png" alt="Permutation importance chart showing feature relevance"><figcaption><strong>Figure 1.</strong> Permutation importance of the model features.</figcaption></figure>
-    </section>
+<main>
 
-    <section>
-      <h2 id="limitations">5. Limitations</h2>
-      <ul>
-        <li><strong>Proxy label:</strong> Within‑month decline, not true future decay.</li>
-        <li><strong>Single month:</strong> March 2026 only; no seasonal or algorithm‑update testing.</li>
-        <li><strong>Client‑grouped split:</strong> Reduces but does not eliminate dataset bias.</li>
-        <li><strong>No content‑quality signals:</strong> The model flags risk, not content accuracy.</li>
-        <li><strong>No causal claims:</strong> All associations are observed.</li>
-      </ul>
-    </section>
+  <!-- ============================================================ -->
+  <section class="sec" id="framing">
+    <span class="folio">01</span>
+    <h2>Problem framing</h2>
+    <p><strong>Decision supported:</strong> which pages should a content strategist review for refresh first, given limited editorial time and resources.</p>
+    <p><strong>Unit of analysis:</strong> one content item per client, aggregated over a calendar month.</p>
+    <p><strong>Output:</strong> a ranked list (score) with action labels and reason codes.</p>
+    <p><strong>Human action:</strong> start at rank 1 and review the page for possible content refresh, metadata updates, or consolidation. Actions are never automated; every recommendation requires human judgment.</p>
+    <p><strong>Cost of a wrong call:</strong> a false positive wastes editorial time on a page that does not need a refresh; a false negative lets a declining page go unnoticed, risking further traffic loss.</p>
+    <p><strong>Why data/ML helps:</strong> the signal space — age, impressions, position, CTR, engagement — is small and interpretable, but a simple rule cannot capture non-linear interactions (staleness matters most when a page is still visible). A learned model can combine these signals more flexibly and produce a calibrated risk score.</p>
+  </section>
 
-    <section>
-      <h2 id="recommendations">6. Ranked recommendations</h2>
-      <p>The full ranked queue is available as <code>work/outputs/w07_action_queue.csv</code>. The top 10 items are shown below.</p>
-      <p><strong>Action labels:</strong></p>
-      <ul>
-        <li><code>review_for_refresh</code> – top decile risk + ≥500 impressions.</li>
-        <li><code>monitor</code> – high risk low traffic, or moderate risk visible.</li>
-        <li><code>no_action</code> – low risk or invisible.</li>
-      </ul>
-      <p><strong>How to use:</strong> Start at rank 1 and review downward. Every item must pass a human check before any action.</p>
-      <figure class="figure"><img src="figures/action_distribution.png" alt="Action distribution chart highlighting recommendation breakdown"><figcaption><strong>Figure 2.</strong> Distribution of recommended actions in the ranked queue.</figcaption></figure>
-    </section>
+  <!-- ============================================================ -->
+  <section class="sec" id="data">
+    <span class="folio">02</span>
+    <h2>Data safety</h2>
 
-    <section>
-      <h2 id="reproducibility">7. Reproducibility</h2>
-      <p><strong>Environment:</strong> Colab with DuckDB, scikit‑learn 1.3+, pandas 2.0+, numpy 1.24+, matplotlib 3.7+.</p>
-      <p><strong>Random seeds:</strong> <code>random_state=42</code> for all splits and models.</p>
-      <p><strong>Commands:</strong></p>
-<pre><code>git clone https://github.com/ozair247/flyrank-ml-internship
-# Open work/notebooks/capstone.ipynb in Colab and run all cells.</code></pre>
-      <p>Metrics JSONs are committed in <code>work/outputs/</code> for verification.</p>
-    </section>
+    <h3>Data used</h3>
+    <ul>
+      <li><code>fact_content_daily_performance</code> — partitioned, <code>month=2026-03</code></li>
+      <li><code>dim_content</code> — content metadata</li>
+      <li><code>dim_clients</code> — history start dates, used only for availability checks</li>
+    </ul>
 
-    
-  
+    <h3>Columns deliberately excluded</h3>
+    <ul>
+      <li><code>impr_last15</code>, <code>impr_prev15</code> — the label's own ingredients; using them as features would be leakage.</li>
+      <li><code>gsc_sum_position</code> — redundant with <code>gsc_avg_position</code>, adds no independent signal.</li>
+      <li>All raw URL, keyword, and client identifiers — kept hashed; never used as features.</li>
+      <li><code>health_score</code>, <code>priority_score</code>, <code>action_type</code> — product decision outputs that must not be learned from.</li>
+    </ul>
+
+    <h3>Leakage risks considered</h3>
+    <ul>
+      <li>Future-window columns (<code>impr_last15</code>, <code>impr_prev15</code>) were never included in the feature set.</li>
+      <li>Pseudonymous IDs (<code>client_hash_id</code>, <code>content_hash_id</code>) were used only for grouping and joining, never as model features.</li>
+      <li>No client-identifying information appears anywhere under <code>work/</code>.</li>
+    </ul>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="sec" id="baseline">
+    <span class="folio">03</span>
+    <h2>Baseline</h2>
+    <p><strong>Transparent rule:</strong></p>
+    <pre><code>score = (content_age_days &gt;= 180) &times; (impressions_month &gt;= 500) &times; impressions_month</code></pre>
+
+    <p><strong>Why it is a fair comparison:</strong></p>
+    <ul>
+      <li>It uses only two signals that are available before the decision moment.</li>
+      <li>It produces a ranking in the same format as the model — higher score, higher review priority.</li>
+      <li>It was evaluated on the <strong>same</strong> client-grouped test split as the model.</li>
+    </ul>
+
+    <table class="ledger">
+      <thead><tr><th>Baseline (held-out test set, 15 clients)</th><th class="num">Value</th></tr></thead>
+      <tbody>
+        <tr><td>Precision@20</td><td class="num">0.00</td></tr>
+        <tr><td>Precision@50</td><td class="num">0.04</td></tr>
+        <tr><td>Test base rate</td><td class="num">0.269</td></tr>
+      </tbody>
+    </table>
+
+    <p>The baseline's near-zero Precision@20 is not a bug; it reflects the rule's tendency to push very old, high-impression pages to the top, regardless of actual decline.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="sec" id="model">
+    <span class="folio">04</span>
+    <h2>Model / analysis</h2>
+
+    <p><strong>Method:</strong> Random Forest classifier — 300 trees, max depth 6, min samples per leaf 20, <code>random_state=42</code>.</p>
+    <p><strong>Why it fits the lane:</strong></p>
+    <ul>
+      <li>The label is binary (<code>is_declining_proxy</code>), and a probability is needed to rank.</li>
+      <li>Random Forest can express non-linear interactions — staleness mattering only at certain traffic levels, for example.</li>
+      <li>It is more interpretable than gradient boosting, and easier to explain to stakeholders.</li>
+    </ul>
+
+    <h3>Feature list</h3>
+    <table class="kv">
+      <tr><th>content_age_days</th><td>Days since content creation.</td></tr>
+      <tr><th>impressions_month</th><td>Total Google Search Console impressions in March.</td></tr>
+      <tr><th>ctr_month</th><td>Clicks &divide; impressions &times; 100.</td></tr>
+      <tr><th>avg_position_month</th><td>Average GSC position — zero-values (no data) removed before averaging.</td></tr>
+      <tr><th>engagement_rate_month</th><td>GA4 engaged sessions &divide; sessions &times; 100; zero where no sessions.</td></tr>
+      <tr><th>has_ga4_month</th><td>1 if any GA4 data is available that month, else 0.</td></tr>
+      <tr><th>word_count</th><td>Word count of the content; missing filled with 0.</td></tr>
+      <tr><th>has_word_count</th><td>1 if word count is present, else 0.</td></tr>
+    </table>
+
+    <h3>Left out on purpose</h3>
+    <ul>
+      <li><code>clicks_month</code> — highly correlated with impressions; adds nothing for ranking.</li>
+      <li><code>sessions_month</code>, <code>engaged_sessions_month</code> — raw counts already represented by the engagement rate.</li>
+      <li><code>impr_last15</code>, <code>impr_prev15</code> — label ingredients (leakage).</li>
+      <li>Content type, intent, keyword metrics — excluded to keep the model simple and focused on performance signals.</li>
+    </ul>
+
+    <h3>Target definition</h3>
+    <p><code>is_declining_proxy</code> = 1 if <code>impr_prev15 &gt; 0</code> and <code>impr_last15 &lt; 0.8 &times; impr_prev15</code>; else 0.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="sec" id="evaluation">
+    <span class="folio">05</span>
+    <h2>Evaluation</h2>
+
+    <div class="with-note">
+      <p><strong>Split:</strong> grouped by <code>client_hash_id</code> — 70% train, 30% test — using <code>GroupShuffleSplit</code> with <code>random_state=42</code>.</p>
+      <aside class="sidenote"><strong>Why grouped:</strong> pages from the same client share a template, vertical, and team. A random split would leak client information from train to test and inflate scores.</aside>
     </div>
-  </article>
+
+    <h3>Metrics — same split for baseline and model</h3>
+    <table class="ledger">
+      <thead><tr><th>Model</th><th class="num">Precision@20</th><th class="num">Precision@50</th><th class="num">AUROC</th></tr></thead>
+      <tbody>
+        <tr><td>Baseline rule (Week 4)</td><td class="num">0.00</td><td class="num">0.04</td><td class="num">0.500</td></tr>
+        <tr class="win"><td>Random Forest</td><td class="num">0.55</td><td class="num">0.56</td><td class="num">0.649</td></tr>
+      </tbody>
+    </table>
+    <p style="font-family:var(--mono); font-size:0.85rem; color:var(--ink-soft);">Test base rate = 0.269</p>
+
+    <h3>Error analysis</h3>
+    <div class="with-note">
+      <p>Among the model's top 50 predictions, 22 are false positives. They cluster in two age bands: 5 under 90 days, 17 between 180&ndash;365 days. The three highest-confidence false positives all share <code>impressions_month = 1</code> and <code>ctr_month = 0</code> — pages with no prior traffic baseline. The proxy label cannot mark them as declining because there is nothing to decline from; the model reads staleness as decline risk even when traffic is near zero.</p>
+      <aside class="sidenote">22 of 50 is a real limitation, not noise — nearly half the model's own top picks miss on this proxy label.</aside>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="sec" id="interpretation">
+    <span class="folio">06</span>
+    <h2>Interpretation</h2>
+
+    <h3>Top features by permutation importance</h3>
+    <ol class="plain">
+      <li><code>content_age_days</code> (0.066) — older pages are more likely to be flagged as declining; matches the baseline's staleness idea.</li>
+      <li><code>impressions_month</code> (0.036) — visible pages are more likely to show a decline signal.</li>
+      <li><code>avg_position_month</code> (0.021) — lower positions (worse ranking) correlate with decline risk.</li>
+    </ol>
+
+    <figure class="fig">
+      <img src="docs/figures/importance.png" alt="Permutation importance bar chart, eight features"
+           onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'fig-missing',textContent:'Figure not found at work/figures/importance.png — commit the file at that path.'}))">
+      <figcaption>Figure 1. Permutation importance, Random Forest, held-out test set (20 repeats).</figcaption>
+    </figure>
+
+    <h3>Surprises &amp; negative results</h3>
+    <div class="callout negative">
+      <span class="callout-label">Negative result</span>
+      Very old pages (365+ days) actually have a <strong>lower</strong> decline rate than middle-aged pages (90&ndash;180 days). Age alone is not monotonic — staleness matters, but only up to a point.
+    </div>
+    <div class="callout negative">
+      <span class="callout-label">Negative result</span>
+      Low CTR among top-ranking pages is <strong>not</strong> associated with higher decline risk. This was counterintuitive, and means the original "CTR-fix" flag from earlier lanes may be misaligned with actual decline.
+    </div>
+
+    <p><strong>Key insight:</strong> the model's value comes from balancing staleness against visibility and recent ranking signals — exactly the balance a fixed rule cannot strike.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="sec" id="recommendation">
+    <span class="folio">07</span>
+    <h2>Recommendation</h2>
+
+    <p>The model's score converts into a ranked action queue with three labels:</p>
+    <dl class="actions">
+      <div><dt>review_for_refresh</dt><dd>Top-decile risk, with &ge;500 impressions.</dd></div>
+      <div><dt>monitor</dt><dd>High risk but low traffic, or moderate risk with visible traffic.</dd></div>
+      <div><dt>no_action</dt><dd>Low risk, or invisible.</dd></div>
+    </dl>
+
+    <figure class="fig">
+      <img src="docs/figures/action_distribution.png" alt="Distribution of action labels across the ranked queue"
+           onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'fig-missing',textContent:'Figure not found at work/figures/action_distribution.png — commit the file at that path.'}))">
+      <figcaption>Figure 2. Action label distribution across the full ranked queue.</figcaption>
+    </figure>
+
+    <a class="csv-chip" href="work/outputs/w07_action_queue.csv">&#8595; Download the full ranked queue (CSV)</a>
+
+    <p><strong>How a FlyRank editor would use it tomorrow:</strong> start at rank 1, review the page — is it live? is the decline seasonal? is an update already scheduled? — and only then decide whether to refresh content, update metadata, or leave it as is. Every item must pass a human check; the model is decision-support, not an automated system.</p>
+
+    <div class="with-note">
+      <p><strong>Confidence and limits:</strong> on the held-out client split, Precision@50 is 0.56, but this rests on a single month and a proxy label. I would not recommend using the model on a new client, or a different time period, without retraining. False positives on near-zero-traffic pages are the biggest risk; a simple pre-filter would likely improve precision further.</p>
+      <aside class="sidenote"><strong>Suggested pre-filter:</strong><br><code>impr_prev15 &ge; 10</code><br>would drop most of the zero-traffic false positives identified in §5.</aside>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="sec" id="repro">
+    <span class="folio">08</span>
+    <h2>Reproducibility</h2>
+
+    <table class="kv">
+      <tr><th>Environment</th><td>Colab · DuckDB · scikit-learn 1.3+ · pandas 2.0+ · numpy 1.24+ · matplotlib 3.7+</td></tr>
+      <tr><th>Random seeds</th><td><code>random_state=42</code> for the train/test split, Logistic Regression, and Random Forest.</td></tr>
+    </table>
+
+    <h3>Re-run from a fresh clone</h3>
+    <pre><code>git clone https://github.com/ozair247/flyrank-ml-internship
+# Open work/notebooks/w07_action_playbook.ipynb in Colab
+# (requires a Hugging Face token). Runtime &rarr; Run all.</code></pre>
+    <p>The notebook regenerates <code>work/outputs/w07_action_queue.csv</code>, <code>work/figures/action_distribution.png</code>, and <code>work/figures/importance.png</code>.</p>
+
+    <p><strong>Sealed / holdout evaluation note:</strong> all model evaluation in this report was performed on a grouped split using <code>GroupShuffleSplit</code> with <code>random_state=42</code>. The exact split code is in <code>w05_model.ipynb</code> and <code>w07_action_playbook.ipynb</code>. The committed <code>w05_model_metrics.json</code> contains the same numbers printed above.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="sec" id="ack" style="border-bottom:none;">
+    <span class="folio">09</span>
+    <h2>Acknowledgments</h2>
+    <p>Built on the FlyRank ML Internship dataset — <a href="https://flyrank.ai">flyrank.ai</a></p>
+  </section>
+
+  <!-- ============================================================ -->
+  <div class="certification">
+    <div>
+      <h3>Certification</h3>
+      <ul>
+        <li>Claims use careful language: observed, measured, directional, decision-support.</li>
+        <li>Test base rate 0.269; model Precision@50 0.56 (lift +0.291 over base rate).</li>
+        <li>Model AUROC 0.649, against 0.500 for the baseline rule.</li>
+        <li>No causal claims. No claim of predicting a search engine's algorithm. No client-identifying detail anywhere above.</li>
+        <li>Numbers above match a fresh notebook re-run, committed alongside this report.</li>
+      </ul>
+    </div>
+    <div class="stamp small">
+      <span class="s-label">Verified</span>
+      <span class="s-value">&#10003;</span>
+      <span class="s-sub">Checklist<br>complete</span>
+    </div>
+  </div>
+
 </main>
 
-<footer class="site-footer">
-  <p>Built on the FlyRank ML Internship dataset · <a href="https://flyrank.ai" target="_blank" rel="noopener noreferrer">flyrank.ai</a></p>
-  <p class="print-note">Prepared as a GitHub Pages publication · print stylesheet included</p>
+<footer class="colophon">
+  FlyRank ML Internship &middot; Lane 2, Refresh / Content Opportunity Scoring<br>
+  <a href="https://github.com/ozair247/flyrank-ml-internship">github.com/ozair247/flyrank-ml-internship</a>
 </footer>
 
 </body>
