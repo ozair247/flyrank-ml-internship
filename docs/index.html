@@ -1,151 +1,288 @@
-<h1 id="capstone-report-refresh-content-opportunity-scoring">Capstone Report — Refresh / Content Opportunity Scoring</h1>
-<ul>
-<li><strong>Author:</strong> Ozair Malik</li>
-<li><strong>Lane:</strong> Lane 2 — Refresh / Content Opportunity Scoring</li>
-<li><strong>Repo:</strong> <a href="https://github.com/ozair247/flyrank-ml-internship">https://github.com/ozair247/flyrank-ml-internship</a></li>
-<li><strong>Date:</strong> 2026-08-27</li>
-</ul>
-<h2 id="0-abstract">0. Abstract</h2>
-<p>We ask whether a learned model can prioritize content refresh candidates better than a hand‑written rule using only search performance and content metadata from a single month. The analysis uses 9.8 million daily search rows from March 2026, aggregated to 176,000 content‑item records with features such as age, impressions, CTR, average position, and engagement signals. A Random Forest model trained on these features and evaluated on a client‑grouped held‑out split achieves Precision@50 of 0.56, compared with 0.04 for the Week‑4 baseline rule — a 52‑percentage‑point improvement. The model output is converted into a ranked action queue with reason codes, intended to help a content strategist decide which pages to review first. All findings are directional and decision‑support only; no production claims are made.</p>
-<h2 id="1-problem-framing">1. Problem framing</h2>
-<p><strong>Decision supported:</strong> Which pages should a content strategist review for refresh first, given limited editorial time and resources.</p>
-<p><strong>Unit of analysis:</strong> One content item per client, aggregated over a calendar month.</p>
-<p><strong>Output:</strong> A ranked list (score) with action labels and reason codes.</p>
-<p><strong>Human action:</strong> Start at rank 1 and review the page for possible content refresh, metadata updates, or consolidation. Do not automate actions; every recommendation requires human judgment.</p>
-<p><strong>Cost of a wrong call:</strong> A false positive wastes editorial time on a page that does not need a refresh; a false negative lets a declining page go unnoticed, risking further traffic loss.</p>
-<p><strong>Why data/ML helps:</strong> The signal space (age, impressions, position, CTR, engagement) is small and interpretable, but a simple rule cannot capture non‑linear interactions (e.g., staleness matters most when a page is still visible). A learned model can combine these signals more flexibly and produce a calibrated risk score.</p>
-<h2 id="2-data-safety">2. Data safety</h2>
-<p><strong>Data used:</strong></p>
-<ul>
-<li><code>fact_content_daily_performance</code> (partitioned, month=2026-03)</li>
-<li><code>dim_content</code> (content metadata)</li>
-<li><code>dim_clients</code> (history start dates, used only for availability checks)</li>
-</ul>
-<p><strong>Columns deliberately excluded:</strong></p>
-<ul>
-<li><code>impr_last15</code> and <code>impr_prev15</code> — they are the label’s own ingredients; using them as features would be leakage.</li>
-<li><code>gsc_sum_position</code> — redundant with <code>gsc_avg_position</code>, adds no independent signal.</li>
-<li>All raw URL, keyword, and client identifiers — kept hashed; never used as features.</li>
-<li><code>health_score</code>, <code>priority_score</code>, <code>action_type</code> — product decision outputs that must not be learned from.</li>
-</ul>
-<p><strong>Leakage risks considered:</strong></p>
-<ul>
-<li>Future‑window columns (<code>impr_last15</code>, <code>impr_prev15</code>) were never included in the feature set.</li>
-<li>Pseudonymous IDs (<code>client_hash_id</code>, <code>content_hash_id</code>, etc.) were used only for grouping and joining, never as model features.</li>
-<li>No client‑identifying information appears anywhere under <code>work/</code>.</li>
-</ul>
-<h2 id="3-baseline">3. Baseline</h2>
-<p><strong>Transparent rule:</strong><br><code>score = (content_age_days ≥ 180) × (impressions_month ≥ 500) × impressions_month</code></p>
-<p>Why it is a fair comparison:  </p>
-<ul>
-<li>It uses only two signals that are available before the decision moment.  </li>
-<li>It produces a ranking in the same format as the model (higher score = higher review priority).  </li>
-<li>It was evaluated on the <strong>same</strong> client‑grouped test split as the model.</li>
-</ul>
-<p><strong>Baseline numbers (held‑out test set, 15 clients):</strong></p>
-<ul>
-<li>Precision@20 = 0.00  </li>
-<li>Precision@50 = 0.04  </li>
-<li>Test base rate = 0.269</li>
-</ul>
-<p>The baseline’s near‑zero Precision@20 is not a bug; it reflects the rule’s tendency to push very old, high‑impression pages to the top, regardless of actual decline.</p>
-<h2 id="4-model-analysis">4. Model / analysis</h2>
-<p><strong>Method:</strong> Random Forest classifier (300 trees, max depth 6, min samples leaf 20, random state 42).<br>Why it fits the lane:  </p>
-<ul>
-<li>The label is binary (<code>is_declining_proxy</code>), and we need a probability to rank.  </li>
-<li>Random Forest can express non‑linear interactions (e.g., staleness matters only at certain traffic levels).  </li>
-<li>It is more interpretable than gradient boosting and easier to explain to stakeholders.</li>
-</ul>
-<p><strong>Feature list:</strong></p>
-<ul>
-<li><code>content_age_days</code> — days since content creation.  </li>
-<li><code>impressions_month</code> — total Google Search Console impressions in March.  </li>
-<li><code>ctr_month</code> — clicks / impressions × 100.  </li>
-<li><code>avg_position_month</code> — average GSC position (0‑values removed).  </li>
-<li><code>engagement_rate_month</code> — GA4 engaged sessions / sessions × 100 (0 where no sessions).  </li>
-<li><code>has_ga4_month</code> — 1 if any GA4 data available; 0 otherwise.  </li>
-<li><code>word_count</code> — number of words in content (missing filled with 0).  </li>
-<li><code>has_word_count</code> — 1 if word count is present; 0 otherwise.</li>
-</ul>
-<p><strong>Left out on purpose:</strong></p>
-<ul>
-<li><code>clicks_month</code> — highly correlated with impressions; not needed for ranking.  </li>
-<li><code>sessions_month</code>, <code>engaged_sessions_month</code> — raw counts are already represented by engagement rate.  </li>
-<li><code>impr_last15</code>, <code>impr_prev15</code> — label ingredients (leakage).  </li>
-<li>Content type, intent, keyword metrics — not used to keep the model simple and focused on performance signals.</li>
-</ul>
-<p><strong>Target (proxy) definition:</strong><br><code>is_declining_proxy = 1</code> if <code>impr_prev15 &gt; 0</code> and <code>impr_last15 &lt; 0.8 × impr_prev15</code>; else 0.</p>
-<h2 id="5-evaluation">5. Evaluation</h2>
-<p><strong>Split:</strong> Grouped by <code>client_hash_id</code> (70% train, 30% test) using <code>GroupShuffleSplit</code> with <code>random_state=42</code>.<br>Why: Pages from the same client share a template, vertical, and team. A random split would leak information about a client from train to test and inflate scores.</p>
-<p><strong>Metrics (same split for baseline and model):</strong></p>
-<table>
-<thead>
-<tr>
-<th>Model</th>
-<th style="text-align:right">Precision@20</th>
-<th style="text-align:right">Precision@50</th>
-<th style="text-align:right">AUROC</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Baseline rule (Week 4)</td>
-<td style="text-align:right">0.00</td>
-<td style="text-align:right">0.04</td>
-<td style="text-align:right">0.500</td>
-</tr>
-<tr>
-<td>Random Forest</td>
-<td style="text-align:right">0.55</td>
-<td style="text-align:right">0.56</td>
-<td style="text-align:right">0.649</td>
-</tr>
-</tbody>
-</table>
-<p>Test base rate = 0.269</p>
-<p><strong>Error analysis:</strong><br>Among the model’s top 50 predictions, 22 are false positives. They cluster in two age buckets: 5 under 90 days and 17 between 180–365 days. The top three false positives have <code>impressions_month = 1</code> and <code>ctr_month = 0</code> — pages with no prior traffic baseline. The proxy label cannot mark them as declining because there is nothing to decline from; the model incorrectly treats staleness as decline risk when traffic is near zero.</p>
-<h2 id="6-interpretation">6. Interpretation</h2>
-<p><strong>Top features by permutation importance:</strong></p>
-<ol>
-<li><code>content_age_days</code> (0.066) — older pages are more likely to be flagged as declining; matches the baseline’s staleness idea.</li>
-<li><code>impressions_month</code> (0.036) — visible pages are more likely to show decline signal.</li>
-<li><code>avg_position_month</code> (0.021) — lower positions (worse ranking) correlate with decline risk.</li>
-</ol>
-<p><strong>Surprises / negative results:</strong></p>
-<ul>
-<li>Very old pages (365+ days) actually have a <strong>lower</strong> decline rate than middle‑aged pages (90–180 days). Age alone is not monotonic; staleness matters, but only up to a point.</li>
-<li>Low CTR among top‑ranking pages is <strong>not</strong> associated with higher decline risk. This was a counterintuitive finding and means the original “CTR‑fix” flag may be misaligned.</li>
-</ul>
-<p><strong>Key insight:</strong> The model’s value comes from balancing staleness with visibility and recent ranking signals — exactly what a simple rule cannot do.</p>
-<h2 id="7-recommendation">7. Recommendation</h2>
-<p><strong>Ranked actions:</strong> The model outputs a queue with action labels:</p>
-<ul>
-<li><code>review_for_refresh</code> — top decile risk + ≥500 impressions.</li>
-<li><code>monitor</code> — high risk but low traffic, or moderate risk with visible traffic.</li>
-<li><code>no_action</code> — low risk or invisible.</li>
-</ul>
-<p><strong>How a FlyRank editor would use it tomorrow:</strong><br>Start at rank 1, review the page (is it live? is the decline seasonal? is an update already scheduled?), and only then decide whether to refresh content, update metadata, or leave as is. Every item must pass a human check; the model is decision‑support, not an automated system.</p>
-<p><strong>Confidence and limits:</strong><br>On the held‑out client split, Precision@50 is 0.56, but this is based on a single month and a proxy label. I would not recommend using the model on a new client or a different time period without retraining. False positives on near‑zero‑traffic pages are the biggest risk; a simple pre‑filter (<code>impr_prev15 ≥ 10</code>) would likely improve precision further.</p>
-<h2 id="8-reproducibility">8. Reproducibility</h2>
-<p><strong>Environment:</strong> Colab with DuckDB, scikit‑learn 1.3+, pandas 2.0+, numpy 1.24+, matplotlib 3.7+.</p>
-<p><strong>Random seeds:</strong> <code>random_state=42</code> for train/test split, logistic regression, and Random Forest.</p>
-<p><strong>Commands to re‑run everything from a fresh clone:</strong></p>
-<ol>
-<li><code>git clone https://github.com/ozair247/flyrank-ml-internship</code></li>
-<li>Open <code>work/notebooks/w07_action_playbook.ipynb</code> in Colab (requires Hugging Face token).</li>
-<li>Run all cells. The notebook regenerates:<ul>
-<li><code>work/outputs/w07_action_queue.csv</code></li>
-<li><code>work/figures/action_distribution.png</code></li>
-<li><code>work/figures/importance.png</code></li>
-</ul>
-</li>
-</ol>
-<p><strong>Sealed / holdout evaluation note:</strong><br>All model evaluation in this report was performed on a grouped split using <code>GroupShuffleSplit</code> with <code>random_state=42</code>. The exact split code is in <code>w05_model.ipynb</code> and <code>w07_action_playbook.ipynb</code>. The metrics JSON (<code>w05_model_metrics.json</code>) is committed and contains the same numbers printed above.</p>
-<h2 id="9-acknowledgments-data-credit">9. Acknowledgments &amp; data credit</h2>
-<p>Built on the FlyRank ML Internship dataset — <a href="https://flyrank.ai">https://flyrank.ai</a></p>
-<hr>
-<blockquote>
-<p><strong>Claims checklist before submitting:</strong> observed / measured / directional / decision-support
-<strong>Metrics vs. base rate:</strong> Test base rate = 0.269; model Precision@50 = 0.56 (lift = +0.291); model AUROC = 0.649 (baseline = 0.500).
-No causal claims; no “predicted Google’s algorithm”; no client‑identifying details; numbers match a fresh re‑run.</p>
-</blockquote>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prioritizing Content Refreshes with Search Data</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --primary: #0f172a;
+      --accent: #2563eb;
+      --border: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      padding: 0 0 3rem 0;
+    }
+
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 3rem 1.5rem;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      max-width: 850px;
+      margin: 0 auto 0.75rem auto;
+      line-height: 1.3;
+    }
+
+    header p {
+      color: #cbd5e1;
+      font-size: 0.95rem;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .abstract {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 5px solid var(--accent);
+      padding: 1.5rem 2rem;
+      border-radius: 12px;
+      margin-bottom: 2.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .abstract h2 {
+      font-size: 1.35rem;
+      margin-bottom: 0.75rem;
+    }
+
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem 2.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+
+    h3 {
+      font-size: 1.2rem;
+      margin: 1.5rem 0 0.75rem 0;
+      font-weight: 600;
+    }
+
+    p {
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    ul, ol {
+      margin: 0 0 1rem 1.25rem;
+    }
+
+    li {
+      margin-bottom: 0.35rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.25rem 0;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+    }
+
+    tr:hover td {
+      background: #fafafa;
+    }
+
+    code {
+      background: #f1f5f9;
+      padding: 0.2rem 0.4rem;
+      border-radius: 5px;
+      font-size: 0.9em;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 1rem 1.5rem;
+      border-radius: 10px;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      margin: 1rem 0;
+      display: block;
+    }
+
+    .ack {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 2rem;
+      padding: 1rem 0;
+    }
+
+    .ack a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .ack a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Prioritizing Content Refreshes with Search Data</h1>
+    <p>A decision‑support model for SEO teams, built on the FlyRank ML Internship dataset</p>
+    <p style="margin-top: 0.75rem; font-size: 0.95rem; color: #cbd5e1;">
+      <strong>Author:</strong> Ozair Malik &nbsp;·&nbsp;
+      <strong>Lane:</strong> Refresh / Content Opportunity Scoring &nbsp;·&nbsp;
+      <strong>Date:</strong> 2026-08-27
+    </p>
+  </header>
+
+  <div class="container">
+
+    <div class="abstract">
+      <h2>Abstract</h2>
+      <p>We ask whether a learned model can prioritize content refresh candidates better than a hand‑written rule using only search performance and content metadata from a single month. The analysis uses 9.8 million daily search rows from March 2026, aggregated to 176,000 content‑item records with features such as age, impressions, CTR, average position, and engagement signals. A Random Forest model trained on these features and evaluated on a client‑grouped held‑out split achieves Precision@50 of 0.56, compared with 0.04 for the Week‑4 baseline rule — a 52‑percentage‑point improvement. The model output is converted into a ranked action queue with reason codes, intended to help a content strategist decide which pages to review first. All findings are directional and decision‑support only; no production claims are made.</p>
+    </div>
+
+    <section>
+      <h2>1. Introduction / Problem statement</h2>
+      <p><strong>Decision supported:</strong> Which pages should a content strategist review for refresh first, given limited editorial time and resources.</p>
+      <p><strong>Unit of analysis:</strong> One content item per client, aggregated over a calendar month.</p>
+      <p><strong>Output:</strong> A ranked list (score) with action labels and reason codes.</p>
+      <p><strong>Human action:</strong> Start at rank 1 and review the page for possible content refresh, metadata updates, or consolidation. Do not automate actions; every recommendation requires human judgment.</p>
+      <p><strong>Cost of a wrong call:</strong> A false positive wastes editorial time on a page that does not need a refresh; a false negative lets a declining page go unnoticed, risking further traffic loss.</p>
+      <p><strong>Why data/ML helps:</strong> The signal space (age, impressions, position, CTR, engagement) is small and interpretable, but a simple rule cannot capture non‑linear interactions. A learned model can combine these signals more flexibly and produce a calibrated risk score.</p>
+    </section>
+
+    <section>
+      <h2>2. Data</h2>
+      <p><strong>Release:</strong> FlyRank internship warehouse (Hugging Face <code>FlyRank/internship-warehouse</code>).</p>
+      <p><strong>Tables used:</strong> <code>fact_content_daily_performance</code> (partitioned, month=2026-03), <code>dim_content</code>.</p>
+      <p><strong>Date window:</strong> March 1–31, 2026 (mid‑panel). The sealed <code>month=2026-06</code> and <code>_sample</code> were never used.</p>
+      <p><strong>Excluded:</strong></p>
+      <ul>
+        <li>Rows with missing <code>content_created_date</code> (age cannot be computed).</li>
+        <li>Rows with zero impressions (no signal).</li>
+        <li>GA4 metrics where <code>ga4_data_available</code> is false.</li>
+        <li>Any client or URL identifiers – kept hashed; no raw names or URLs appear.</li>
+      </ul>
+      <p><strong>Public safety:</strong> All content is pseudonymized; only aggregate statistics are reported.</p>
+    </section>
+
+    <section>
+      <h2>3. Methodology</h2>
+      <p><strong>Assumptions:</strong> The proxy label (<code>is_declining_proxy</code>) — a ≥20% drop in impressions in the last 15 days vs. the prior 15 days — is a reasonable signal of content decay. March 2026 is representative.</p>
+      <p><strong>Features:</strong> <code>content_age_days</code>, <code>impressions_month</code>, <code>ctr_month</code>, <code>avg_position_month</code>, <code>engagement_rate_month</code>, <code>has_ga4_month</code>, <code>word_count</code>, <code>has_word_count</code>.</p>
+      <p><strong>Label definition:</strong> <code>is_declining_proxy</code> = 1 if <code>impr_prev15 &gt; 0</code> and <code>impr_last15 &lt; 0.8 * impr_prev15</code>, else 0. Label ingredients are never used as features.</p>
+      <p><strong>Baseline:</strong> Week‑4 rule: <code>score = (content_age_days ≥ 180) * (impressions_month ≥ 500) * impressions_month</code>.</p>
+      <p><strong>Validation design:</strong> Grouped split by <code>client_hash_id</code> (70% train, 30% test) to prevent leakage. Same split for baseline and model.</p>
+      <p><strong>Leakage checks:</strong> No overlap between features and label ingredients or product flags.</p>
+    </section>
+
+    <section>
+      <h2>4. Results (vs baseline)</h2>
+      <p>Performance on a held‑out set of 15 clients:</p>
+      <table>
+        <thead>
+          <tr><th>Model</th><th>Precision@20</th><th>Precision@50</th><th>AUROC</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Baseline rule</td><td>0.00</td><td>0.04</td><td>0.500</td></tr>
+          <tr><td>Random Forest</td><td>0.55</td><td>0.56</td><td>0.649</td></tr>
+        </tbody>
+      </table>
+      <p><em>Test base rate = 0.269</em></p>
+      <p>The Random Forest beats the baseline by 52 percentage points at Precision@50. This is directional evidence, not production proof.</p>
+
+      <h3>Feature importance</h3>
+      <img src="../work/figures/importance.png" alt="Permutation importance chart">
+    </section>
+
+    <section>
+      <h2>5. Limitations</h2>
+      <ul>
+        <li><strong>Proxy label:</strong> Within‑month decline, not true future decay.</li>
+        <li><strong>Single month:</strong> March 2026 only; no seasonal or algorithm‑update testing.</li>
+        <li><strong>Client‑grouped split</strong> reduces but does not eliminate dataset bias.</li>
+        <li><strong>No content‑quality signals:</strong> The model flags risk, not content accuracy.</li>
+        <li><strong>No causal claims:</strong> All associations are observed.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. Ranked recommendations</h2>
+      <p>The full ranked queue is available as <code>work/outputs/w07_action_queue.csv</code>. The top 10 items are shown below.</p>
+      <p><strong>Action labels:</strong></p>
+      <ul>
+        <li><code>review_for_refresh</code> – top decile risk + ≥500 impressions.</li>
+        <li><code>monitor</code> – high risk low traffic, or moderate risk visible.</li>
+        <li><code>no_action</code> – low risk or invisible.</li>
+      </ul>
+      <p><strong>How to use:</strong> Start at rank 1 and review downward. Every item must pass a human check before any action.</p>
+      <img src="../work/figures/action_distribution.png" alt="Action distribution chart">
+    </section>
+
+    <section>
+      <h2>7. Reproducibility</h2>
+      <p><strong>Environment:</strong> Colab with DuckDB, scikit‑learn 1.3+, pandas 2.0+, numpy 1.24+, matplotlib 3.7+.</p>
+      <p><strong>Random seeds:</strong> <code>random_state=42</code> for all splits and models.</p>
+      <p><strong>Commands:</strong></p>
+      <pre><code>git clone https://github.com/ozair247/flyrank-ml-internship
+# Open work/notebooks/capstone.ipynb in Colab and run all cells.</code></pre>
+      <p>Metrics JSONs are committed in <code>work/outputs/</code> for verification.</p>
+    </section>
+
+    <div class="ack">
+      <p>Built on the FlyRank ML Internship dataset — <a href="https://flyrank.ai">https://flyrank.ai</a></p>
+    </div>
+
+  </div>
+
+</body>
+</html>
